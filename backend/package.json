@@ -1,0 +1,19 @@
+﻿{
+  "name": "webpilot-ai-backend",
+  "version": "0.1.0",
+  "description": "WebPilot AI — Express backend for browser agent orchestration",
+  "type": "module",
+  "main": "src/server.js",
+  "scripts": {
+    "dev": "node --watch src/server.js",
+    "start": "node src/server.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.0.0",
+    "express": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "license": "ISC"
+}
