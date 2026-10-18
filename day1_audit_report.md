@@ -173,9 +173,51 @@ npx playwright install chromium
 
 ## Day 1 Completion Checklist
 
-- [ ] Ollama installed and `ollama --version` works
-- [ ] `OLLAMA_MODELS` env var set to `D:\ollama_models`
-- [ ] `qwen2.5:7b` model pulled and visible in `ollama list`
-- [ ] Git repository initialized at `d:\Gen_ai_project`
-- [ ] `.gitignore` created and committed
-- [ ] **Await approval before Day 2 scaffold begins**
+- [x] Ollama installed — v0.40.5 at `C:\Users\anupg\AppData\Local\Programs\Ollama`
+- [x] `OLLAMA_MODELS` env var set to `D:\ollama_models` (Machine-level)
+- [x] `qwen2.5:7b` model manifest confirmed at `D:\ollama_models\manifests\registry.ollama.ai\library\qwen2.5\7b`
+- [x] Git repository initialized at `d:\Gen_ai_project` — branch `master`
+- [x] `.gitignore` created and committed (commit `9e493f0`)
+- [x] `package.json` initialized (npm v10.9.2)
+- [x] Playwright v1.64.1 installed as devDependency
+- [x] Playwright Chromium browser binary downloaded (`chromium-1248`, `chromium_headless_shell-1248`)
+- [x] Playwright smoke test written (`smoke-test.js`) and **ALL CHECKS PASSED** (commit `5dc9f62`)
+- [x] **Day 1 COMPLETE — Ready for Day 2 scaffold**
+
+---
+
+## Day 1 Final Status (2026-10-18)
+
+| Item | Result |
+|---|---|
+| Git commits | 2 commits on `master`, no remote |
+| Ollama server | Installed; start manually with `ollama serve` |
+| Model | `qwen2.5:7b` stored on D: drive (verified via manifest) |
+| Playwright | v1.64.1, Chromium headless binary installed on C: |
+| Smoke test | `node smoke-test.js` → exit code 0, all checks passed |
+
+### Actual smoke test output
+```
+=== WebPilot AI -- Playwright Smoke Test ===
+
+[1/4] Launching Playwright Chromium (headless)...
+      OK - Browser launched.
+
+[2/4] Opening isolated browser context...
+      OK - Context and page ready.
+
+[3/4] Navigating to https://example.com ...
+      Page title: "Example Domain"
+      OK - Title matches expected value.
+
+[4/4] Verifying page body content...
+      Body snippet: "This domain is for use in documentation examples without needing permission. Thi"
+      OK - Expected content found in page body.
+
+[close] Closing browser...
+        OK - Browser closed cleanly.
+
+==========================================
+ALL CHECKS PASSED -- Playwright is working correctly.
+==========================================
+```
