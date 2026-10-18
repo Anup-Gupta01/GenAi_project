@@ -1,7 +1,8 @@
-﻿import "dotenv/config";
+import "dotenv/config";
 import express from "express";
 import healthRouter from "./routes/health.js";
 import ollamaRouter from "./routes/ollama.js";
+import browserRouter from "./routes/browser.js";
 
 const PORT = process.env.PORT || 3001;
 const app = express();
@@ -18,6 +19,7 @@ app.use((req, _res, next) => {
 // ── Routes ────────────────────────────────────────────────────────────────────
 app.use("/api/health", healthRouter);
 app.use("/api/ollama", ollamaRouter);
+app.use("/api/browser", browserRouter);
 
 // ── 404 handler ───────────────────────────────────────────────────────────────
 app.use((_req, res) => {
@@ -37,7 +39,8 @@ app.listen(PORT, () => {
   console.log("║   WebPilot AI — Backend v0.1.0       ║");
   console.log("╚══════════════════════════════════════╝");
   console.log(`Server listening on http://localhost:${PORT}`);
-  console.log(`Health:        http://localhost:${PORT}/api/health`);
-  console.log(`Ollama status: http://localhost:${PORT}/api/ollama/status`);
+  console.log(`Health:         http://localhost:${PORT}/api/health`);
+  console.log(`Ollama status:  http://localhost:${PORT}/api/ollama/status`);
+  console.log(`Browser tools:  http://localhost:${PORT}/api/browser/status`);
   console.log("────────────────────────────────────────");
 });
