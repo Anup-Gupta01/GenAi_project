@@ -1,5 +1,6 @@
 import "dotenv/config";
 import express from "express";
+import cors from "cors";
 import healthRouter from "./routes/health.js";
 import ollamaRouter from "./routes/ollama.js";
 import browserRouter from "./routes/browser.js";
@@ -9,6 +10,28 @@ const PORT = process.env.PORT || 3001;
 const app = express();
 
 // ── Middleware ────────────────────────────────────────────────────────────────
+// Allow Vite dev server and any localhost origin to call the backend
+const ALLOWED_ORIGINS = (process.env.CORS_ORIGIN || "http://localhost:5173")
+  .split(",")
+  .map((o) => o.trim())
+  .filter(Boolean);
+
+app.use(
+  cors({
+    origin: (origin, cb) => {
+      // Allow requests with no origin (curl, Postman) and any localhost
+      if (!origin || /^https?:\/\/localhost(:\d+)?$/.test(origin)) {
+        cb(null, true);
+      } else if (ALLOWED_ORIGINS.includes(origin)) {
+        cb(null, true);
+      } else {
+        cb(new Error(`CORS: origin '${origin}' is not allowed`));
+      }
+    },
+    methods: ["GET", "POST", "OPTIONS"],
+    allowedHeaders: ["Content-Type"],
+  })
+);
 app.use(express.json());
 
 // Simple request logger (dev-friendly, no extra deps)

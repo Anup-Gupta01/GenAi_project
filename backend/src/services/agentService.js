@@ -7,8 +7,8 @@ import { browserService } from "./browserService.js";
  */
 export const AGENT_CONFIG = {
   maxSteps: 8,
-  maxDurationMs: 60000, // 60s max per task
-  ollamaTimeoutMs: 30000, // 30s max per LLM turn
+  maxDurationMs: 90000, // 90s max per task
+  ollamaTimeoutMs: 45000, // 45s max per LLM turn
   defaultModel: process.env.OLLAMA_MODEL || "qwen2.5:7b",
   defaultBaseUrl: process.env.OLLAMA_BASE_URL || "http://localhost:11434",
 };
