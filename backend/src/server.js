@@ -3,6 +3,7 @@ import express from "express";
 import healthRouter from "./routes/health.js";
 import ollamaRouter from "./routes/ollama.js";
 import browserRouter from "./routes/browser.js";
+import agentRouter from "./routes/agent.js";
 
 const PORT = process.env.PORT || 3001;
 const app = express();
@@ -20,6 +21,7 @@ app.use((req, _res, next) => {
 app.use("/api/health", healthRouter);
 app.use("/api/ollama", ollamaRouter);
 app.use("/api/browser", browserRouter);
+app.use("/api/agent", agentRouter);
 
 // ── 404 handler ───────────────────────────────────────────────────────────────
 app.use((_req, res) => {
@@ -42,5 +44,6 @@ app.listen(PORT, () => {
   console.log(`Health:         http://localhost:${PORT}/api/health`);
   console.log(`Ollama status:  http://localhost:${PORT}/api/ollama/status`);
   console.log(`Browser tools:  http://localhost:${PORT}/api/browser/status`);
+  console.log(`Agent runner:   http://localhost:${PORT}/api/agent/status`);
   console.log("────────────────────────────────────────");
 });
