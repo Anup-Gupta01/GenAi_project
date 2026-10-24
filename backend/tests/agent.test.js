@@ -383,13 +383,13 @@ describe("Local Live Integration Test (qwen2.5:7b + Browser)", () => {
 
   test(
     "real autonomous agent execution against https://example.com",
-    { timeout: 45000 },
+    { timeout: 60000 },
     async () => {
       const task = "Open https://example.com and tell me the page title";
 
       const result = await agentService.runTask(task, {
         maxSteps: 3,
-        ollamaTimeoutMs: 30000,
+        ollamaTimeoutMs: 50000,
       });
 
       assert.strictEqual(result.status, "completed");

@@ -138,8 +138,12 @@ export async function getPageContent({ maxLength = 10000 } = {}) {
     const bodyLocator = page.locator("body");
     const rawText = (await bodyLocator.innerText({ timeout: 5000 })) || "";
 
-    // Normalize multiple blank lines and tabs
-    const cleanedText = rawText.replace(/\r\n/g, "\n").replace(/[ \t]+/g, " ");
+    // Normalize multiple blank lines and tabs, compact excess line breaks
+    const cleanedText = rawText
+      .replace(/\r\n/g, "\n")
+      .replace(/[ \t]+/g, " ")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
     const truncated = cleanedText.length > maxChars;
     const content = truncated ? cleanedText.slice(0, maxChars) : cleanedText;
 
@@ -161,13 +165,13 @@ export async function getPageContent({ maxLength = 10000 } = {}) {
 
 /**
  * Tool 4: clickElement(selector, options)
- * Clicks a CSS selector and returns a clear success or failure result.
+ * Clicks a CSS selector or visible text, and returns a clear success or failure result.
  *
  * @param {string} selector
  * @param {{ timeout?: number }} [options]
  * @returns {Promise<{ success: boolean, selector: string, message?: string, error?: string }>}
  */
-export async function clickElement(selector, { timeout = 8000 } = {}) {
+export async function clickElement(selector, { timeout = 4000 } = {}) {
   if (typeof selector !== "string" || !selector.trim()) {
     return {
       success: false,
@@ -187,7 +191,24 @@ export async function clickElement(selector, { timeout = 8000 } = {}) {
   const trimmedSelector = selector.trim();
   try {
     const page = await browserService.getPage();
-    await page.click(trimmedSelector, { timeout });
+    try {
+      await page.click(trimmedSelector, { timeout });
+    } catch (primaryErr) {
+      // If primary selector failed and does not look like complex CSS, attempt text fallback
+      const isPlainWord = !trimmedSelector.startsWith(".") &&
+                          !trimmedSelector.startsWith("#") &&
+                          !trimmedSelector.includes("[") &&
+                          !trimmedSelector.startsWith("text=");
+      if (isPlainWord) {
+        try {
+          await page.click(`text="${trimmedSelector}"`, { timeout: 2000 });
+        } catch (_) {
+          throw primaryErr;
+        }
+      } else {
+        throw primaryErr;
+      }
+    }
 
     return {
       success: true,

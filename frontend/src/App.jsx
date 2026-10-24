@@ -136,7 +136,19 @@ function TraceStep({ step }) {
 function SidebarStatus({ health, ollama }) {
   const backendOk = health?.status === "ok";
   const ollamaOk  = ollama?.status === "ok";
-  const model     = ollama?.models?.[0]?.name;
+  const modelReady = Boolean(ollama?.modelReady);
+  const activeModel = ollama?.activeModel || (modelReady ? ollama?.models?.[0]?.name : null);
+  const requiredModel = ollama?.requiredModel || "qwen2.5:7b";
+
+  let ollamaDot = "offline";
+  let ollamaText = "Ollama offline";
+  if (ollamaOk && modelReady) {
+    ollamaDot = "online";
+    ollamaText = "Ollama online";
+  } else if (ollamaOk && !modelReady) {
+    ollamaDot = "pulse";
+    ollamaText = ollama?.reason === "no_models_available" ? "Ollama (no models)" : "Ollama (model missing)";
+  }
 
   return (
     <div className="sidebar-status">
@@ -145,13 +157,21 @@ function SidebarStatus({ health, ollama }) {
         <span>Backend {backendOk ? "online" : "offline"}</span>
       </div>
       <div className="status-row">
-        <StatusDot state={ollamaOk ? "online" : "offline"} />
-        <span>Ollama {ollamaOk ? "online" : "offline"}</span>
+        <StatusDot state={ollamaDot} />
+        <span>{ollamaText}</span>
       </div>
-      {model && (
+      {modelReady && activeModel && (
         <div className="status-row">
           <StatusDot state="online" />
-          <span style={{ fontFamily: "var(--font-mono)", fontSize: 10 }}>{model}</span>
+          <span style={{ fontFamily: "var(--font-mono)", fontSize: 10 }}>{activeModel}</span>
+        </div>
+      )}
+      {ollamaOk && !modelReady && (
+        <div className="status-row">
+          <StatusDot state="pulse" />
+          <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--amber)" }}>
+            Needs {requiredModel}
+          </span>
         </div>
       )}
     </div>
@@ -340,9 +360,10 @@ export default function App() {
 // ── Agent Page ────────────────────────────────────────────────────────────────
 
 function AgentPage({ task, setTask, running, result, error, agentStatus, handleRun, handleClear, handleKeyDown, insertExample, textareaRef, health, ollama }) {
-  const canRun = task.trim().length > 0 && !running && health?.status === "ok";
   const backendDown = health?.status !== "ok";
   const ollamaDown  = ollama?.status !== "ok";
+  const modelMissing = !ollamaDown && ollama?.modelReady !== true;
+  const canRun = task.trim().length > 0 && !running && !backendDown && !ollamaDown && !modelMissing;
 
   return (
     <>
@@ -358,6 +379,11 @@ function AgentPage({ task, setTask, running, result, error, agentStatus, handleR
         {!backendDown && ollamaDown && !running && (
           <div className="error-banner" style={{ marginBottom: 12, borderColor: "var(--amber)", background: "var(--amber-dim)", color: "var(--amber)" }}>
             Ollama is offline. Start Ollama with <code style={{ fontFamily: "var(--font-mono)", fontSize: 12 }}>ollama serve</code> and reload.
+          </div>
+        )}
+        {!backendDown && !ollamaDown && modelMissing && !running && (
+          <div className="error-banner" style={{ marginBottom: 12, borderColor: "var(--amber)", background: "var(--amber-dim)", color: "var(--amber)" }}>
+            <strong>Model not ready:</strong> {ollama?.message || `Required model "${ollama?.requiredModel || "qwen2.5:7b"}" is not loaded.`}
           </div>
         )}
 
@@ -425,7 +451,7 @@ function AgentPage({ task, setTask, running, result, error, agentStatus, handleR
           </div>
           <div style={{ marginTop: 12, fontSize: 12, color: "var(--text-secondary)", display: "flex", alignItems: "center", gap: 8 }}>
             <span className="spinner" style={{ width: 14, height: 14, borderWidth: 2 }} />
-            Agent is thinking and navigating… This may take 15–45 seconds.
+            Agent is thinking and navigating… On local CPU this may take 30–90 seconds.
           </div>
         </div>
       )}

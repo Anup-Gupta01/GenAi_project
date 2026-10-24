@@ -78,6 +78,6 @@ export async function runAgentTask(task) {
       method: "POST",
       body: JSON.stringify({ task }),
     },
-    95000 // 95s — comfortably above the agent's internal 90s limit
+    195000 // 195s — comfortably above the agent's internal 180s limit
   );
 }
