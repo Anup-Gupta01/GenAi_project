@@ -79,9 +79,12 @@ function AgentBadge({ status }) {
     : status === "running" ? "Running…"
     : status === "completed" ? "Completed"
     : status === "failed" ? "Failed"
+    : status === "limit_reached" ? "Limit Reached"
     : "Idle";
+  // Map limit_reached → failed CSS class so styling doesn't break
+  const cls = status === "limit_reached" ? "failed" : (status || "idle");
   return (
-    <span className={`agent-badge ${status || "idle"}`}>
+    <span className={`agent-badge ${cls}`} title={status === "limit_reached" ? "Task hit the maximum step or time limit" : undefined}>
       {status === "running" && <span className="spinner" style={{ width: 10, height: 10, borderWidth: 1.5 }} />}
       {label}
     </span>
@@ -193,14 +196,16 @@ export default function App() {
   // Task state
   const [task, setTask]       = useState("");
   const [running, setRunning] = useState(false);
-  const [agentStatus, setAgentStatus] = useState("idle"); // idle | running | completed | failed
+  const [agentStatus, setAgentStatus] = useState("idle"); // idle | running | completed | failed | limit_reached
   const [result, setResult]   = useState(null); // last agent result
   const [error, setError]     = useState(null);
+  const [elapsedSec, setElapsedSec] = useState(0); // elapsed seconds while running
 
   // History (session-only)
   const [history, setHistory] = useState([]);
 
   const textareaRef = useRef(null);
+  const runStartRef = useRef(null); // timestamp when last task started
 
   // ── System status polling (every 10s) ──
   const pollStatus = useCallback(async () => {
@@ -222,6 +227,19 @@ export default function App() {
     return () => clearInterval(id);
   }, [pollStatus]);
 
+  // ── Elapsed timer while running ──
+  useEffect(() => {
+    if (!running) {
+      setElapsedSec(0);
+      return;
+    }
+    runStartRef.current = Date.now();
+    const id = setInterval(() => {
+      setElapsedSec(Math.floor((Date.now() - runStartRef.current) / 1000));
+    }, 1000);
+    return () => clearInterval(id);
+  }, [running]);
+
   // ── Run task ──
   const handleRun = useCallback(async () => {
     const trimmed = task.trim();
@@ -236,7 +254,11 @@ export default function App() {
       const res = await runAgentTask(trimmed);
       const data = res.data || res;
       setResult(data);
-      setAgentStatus(data.status === "completed" ? "completed" : "failed");
+      // Preserve the actual backend status — completed | failed | limit_reached
+      const finalStatus = ["completed", "failed", "limit_reached"].includes(data.status)
+        ? data.status
+        : "failed";
+      setAgentStatus(finalStatus);
       setHistory((h) => [
         { task: trimmed, status: data.status, finalAnswer: data.finalAnswer, trace: data.trace, durationMs: data.durationMs, ts: Date.now() },
         ...h.slice(0, MAX_HISTORY - 1),
@@ -335,6 +357,7 @@ export default function App() {
               result={result}
               error={error}
               agentStatus={agentStatus}
+              elapsedSec={elapsedSec}
               handleRun={handleRun}
               handleClear={handleClear}
               handleKeyDown={handleKeyDown}
@@ -359,7 +382,7 @@ export default function App() {
 
 // ── Agent Page ────────────────────────────────────────────────────────────────
 
-function AgentPage({ task, setTask, running, result, error, agentStatus, handleRun, handleClear, handleKeyDown, insertExample, textareaRef, health, ollama }) {
+function AgentPage({ task, setTask, running, result, error, agentStatus, elapsedSec, handleRun, handleClear, handleKeyDown, insertExample, textareaRef, health, ollama }) {
   const backendDown = health?.status !== "ok";
   const ollamaDown  = ollama?.status !== "ok";
   const modelMissing = !ollamaDown && ollama?.modelReady !== true;
@@ -452,6 +475,11 @@ function AgentPage({ task, setTask, running, result, error, agentStatus, handleR
           <div style={{ marginTop: 12, fontSize: 12, color: "var(--text-secondary)", display: "flex", alignItems: "center", gap: 8 }}>
             <span className="spinner" style={{ width: 14, height: 14, borderWidth: 2 }} />
             Agent is thinking and navigating… On local CPU this may take 30–90 seconds.
+            {elapsedSec > 0 && (
+              <span style={{ marginLeft: "auto", fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-muted)" }}>
+                {elapsedSec}s elapsed
+              </span>
+            )}
           </div>
         </div>
       )}
@@ -471,12 +499,19 @@ function AgentPage({ task, setTask, running, result, error, agentStatus, handleR
             <div className="card-title" style={{ display: "flex", alignItems: "center", gap: 6 }}>
               {result.status === "completed"
                 ? <><IconCheck /> Final Answer</>
-                : <><IconX /> Task {result.status}</>
+                : result.status === "limit_reached"
+                  ? <span style={{ color: "var(--amber)", display: "flex", alignItems: "center", gap: 6 }}><IconX /> Limit Reached</span>
+                  : <><IconX /> Task Failed</>
               }
               <span style={{ marginLeft: "auto", fontSize: 10, color: "var(--text-muted)" }}>
-                {result.toolExecutionCount} tool{result.toolExecutionCount !== 1 ? "s" : ""} · {result.durationMs}ms
+                {result.toolExecutionCount} tool{result.toolExecutionCount !== 1 ? "s" : ""} · {result.durationMs != null ? `${(result.durationMs / 1000).toFixed(1)}s` : ""}
               </span>
             </div>
+            {result.status === "limit_reached" && (
+              <div style={{ marginBottom: 10, padding: "8px 10px", borderRadius: "var(--radius-sm)", background: "var(--amber-dim)", color: "var(--amber)", fontSize: 12 }}>
+                The task hit the maximum step or time limit before finishing. The partial answer below may be incomplete.
+              </div>
+            )}
             {result.finalAnswer
               ? <div className="answer-box">{result.finalAnswer}</div>
               : <div className="empty-state"><IconInfo /> No final answer returned.</div>

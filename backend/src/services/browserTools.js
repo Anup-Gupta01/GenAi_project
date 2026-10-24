@@ -1,11 +1,46 @@
 import { browserService } from "./browserService.js";
 
 /**
+ * Private / loopback address detection.
+ *
+ * SECURITY POLICY — localhost & private IP navigation:
+ * -------------------------------------------------------
+ * This is a local-only, single-user development tool with no publicly reachable
+ * surface and no multi-tenant risk. Given this context:
+ *
+ *  - localhost and private IP navigation is PERMITTED for developer use
+ *    (e.g. testing a local app at http://localhost:3000).
+ *
+ *  - This helper detects private addresses so they are flagged in logs for
+ *    auditability. Callers may tighten policy in the future without API changes.
+ *
+ *  - Prompt-injection SSRF risk: an untrusted web page could instruct the agent
+ *    to navigate to http://localhost:3001/api/... and read internal API data.
+ *    The system prompt tells the agent to reject such commands from web pages.
+ *    Developers should be aware of this risk if this tool is ever exposed to
+ *    external untrusted task inputs or operated in a multi-user context.
+ *
+ * @param {URL} parsed
+ * @returns {boolean}
+ */
+function isPrivateUrl(parsed) {
+  const h = parsed.hostname.toLowerCase();
+  return (
+    h === "localhost" ||
+    h === "127.0.0.1" ||
+    h === "::1" ||
+    h.startsWith("10.") ||
+    h.startsWith("192.168.") ||
+    /^172\.(1[6-9]|2\d|3[01])\./.test(h)
+  );
+}
+
+/**
  * Validates that a given URL string is syntactically valid and uses http: or https: scheme.
- * Disallows file:, javascript:, data:, and all other non-web schemes.
+ * Disallows file:, javascript:, data:, ftp:, and all other non-web schemes.
  *
  * @param {string} rawUrl
- * @returns {{ valid: boolean, url?: string, error?: string }}
+ * @returns {{ valid: boolean, url?: string, isPrivate?: boolean, error?: string }}
  */
 export function validateUrl(rawUrl) {
   if (typeof rawUrl !== "string" || !rawUrl.trim()) {
@@ -33,9 +68,16 @@ export function validateUrl(rawUrl) {
     };
   }
 
+  const priv = isPrivateUrl(parsed);
+  if (priv) {
+    // Log for auditability — permitted per local-dev policy (see note above).
+    console.log(`[browserTools] Navigating to private/local address: ${parsed.hostname}`);
+  }
+
   return {
     valid: true,
     url: parsed.toString(),
+    isPrivate: priv,
   };
 }
 
@@ -44,7 +86,7 @@ export function validateUrl(rawUrl) {
  * Navigates to an HTTP or HTTPS URL and returns the final URL, page title, and HTTP status.
  *
  * @param {string} rawUrl
- * @returns {Promise<{ success: boolean, url?: string, title?: string, status?: number, error?: string }>}
+ * @returns {Promise<{ success: boolean, url?: string, title?: string, status?: number, isPrivate?: boolean, error?: string }>}
  */
 export async function openPage(rawUrl) {
   const validation = validateUrl(rawUrl);
@@ -71,6 +113,8 @@ export async function openPage(rawUrl) {
       url: finalUrl,
       title,
       status: httpStatus,
+      // Surface private flag for logging/audit (not an error)
+      ...(validation.isPrivate ? { isPrivate: true } : {}),
     };
   } catch (err) {
     return {
@@ -117,6 +161,9 @@ export async function getPageInfo() {
  * Returns readable visible page text, capped to a sensible maximum length.
  * Untrusted page text is returned as raw text data without execution.
  *
+ * Hard cap: 20,000 chars (matches the agent-side validateToolCall cap so the
+ * LLM never receives more content than it can reliably process).
+ *
  * @param {{ maxLength?: number }} [options]
  * @returns {Promise<{ success: boolean, url?: string, content?: string, contentLength?: number, returnedLength?: number, truncated?: boolean, error?: string }>}
  */
@@ -128,9 +175,10 @@ export async function getPageContent({ maxLength = 10000 } = {}) {
     };
   }
 
+  // Hard cap at 20,000 chars — same ceiling as validateToolCall in agentService.
   const maxChars =
     Number.isInteger(maxLength) && maxLength > 0
-      ? Math.min(maxLength, 50000)
+      ? Math.min(maxLength, 20000)
       : 10000;
 
   try {
@@ -138,7 +186,8 @@ export async function getPageContent({ maxLength = 10000 } = {}) {
     const bodyLocator = page.locator("body");
     const rawText = (await bodyLocator.innerText({ timeout: 5000 })) || "";
 
-    // Normalize multiple blank lines and tabs, compact excess line breaks
+    // Normalize multiple blank lines and tabs, compact excess line breaks.
+    // Webpage text is treated as UNTRUSTED DATA — never evaluated or executed.
     const cleanedText = rawText
       .replace(/\r\n/g, "\n")
       .replace(/[ \t]+/g, " ")
@@ -195,10 +244,11 @@ export async function clickElement(selector, { timeout = 4000 } = {}) {
       await page.click(trimmedSelector, { timeout });
     } catch (primaryErr) {
       // If primary selector failed and does not look like complex CSS, attempt text fallback
-      const isPlainWord = !trimmedSelector.startsWith(".") &&
-                          !trimmedSelector.startsWith("#") &&
-                          !trimmedSelector.includes("[") &&
-                          !trimmedSelector.startsWith("text=");
+      const isPlainWord =
+        !trimmedSelector.startsWith(".") &&
+        !trimmedSelector.startsWith("#") &&
+        !trimmedSelector.includes("[") &&
+        !trimmedSelector.startsWith("text=");
       if (isPlainWord) {
         try {
           await page.click(`text="${trimmedSelector}"`, { timeout: 2000 });

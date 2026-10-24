@@ -7,8 +7,8 @@ import { browserService } from "./browserService.js";
  */
 export const AGENT_CONFIG = {
   maxSteps: 8,
-  maxDurationMs: 180000, // 180s (3 min) max per task for local CPU inference
-  ollamaTimeoutMs: 90000, // 90s max per LLM turn on CPU
+  maxDurationMs: 60000,  // 60s max per task (configurable via options)
+  ollamaTimeoutMs: 50000, // 50s max per LLM turn on CPU
   defaultModel: process.env.OLLAMA_MODEL || "qwen2.5:7b",
   defaultBaseUrl: process.env.OLLAMA_BASE_URL || "http://localhost:11434",
 };
@@ -327,7 +327,7 @@ export class AgentService {
           args: { model },
           status: "error",
           error: errorMessage,
-          durationMs: Date.now() - startTime,
+          durationMs: Date.now() - startTime,  // elapsed since task start
         });
 
         return {
